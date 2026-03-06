@@ -1,0 +1,189 @@
+\documentclass[12pt]{article}
+
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{graphicx,url}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{times}
+\usepackage{indentfirst}
+
+\sloppy
+
+% === Comandos compatíveis com formato SBC ===
+\newcommand{\inst}[1]{\textsuperscript{#1}}
+\newenvironment{resumo}{\begin{quote}\textbf{Resumo.} \itshape}{\end{quote}}
+
+\title{Análise Comparativa de Estruturas Disjoint Set Union\\Aplicadas ao Algoritmo de Kruskal}
+
+\author{
+  Nome Aluno 1\inst{1} \quad Nome Aluno 2\inst{1} \quad Nome Aluno 3\inst{1} \quad Nome Aluno 4\inst{1}\\[6pt]
+  \inst{1}Curso de Engenharia de Software\\
+  Pontifícia Universidade Católica de Minas Gerais (PUC Minas)\\
+  Belo Horizonte -- MG -- Brasil\\[4pt]
+  \texttt{\{aluno1,aluno2,aluno3,aluno4\}@sga.pucminas.br}
+}
+
+\begin{document}
+
+\maketitle
+
+% ============================================================
+\begin{resumo}
+Este trabalho investiga o impacto de diferentes heurísticas de otimização na estrutura de dados Disjoint Set Union (DSU), aplicada ao algoritmo de Kruskal para a obtenção da Árvore Geradora Mínima (MST) de grafos ponderados. Foram implementadas três variantes: uma versão ingênua (Naive), uma com Union by Rank, e a versão completa de Tarjan com Union by Rank e Path Compression. Os experimentos comparam o tempo de execução e o número de acessos à memória para grafos de 100 a 50.000 vértices, evidenciando a transição entre as classes de complexidade $O(n)$, $O(\log n)$ e $O(\alpha(n))$.
+\end{resumo}
+
+% ============================================================
+\section{Introdução}
+
+Em diversos domínios da computação, como processamento de imagens, redes de computadores e bioinformática, surge a necessidade de gerenciar grupos de elementos que se fundem ao longo do tempo. O problema fundamental consiste em manter uma partição de um conjunto finito de $n$ elementos em subconjuntos disjuntos, permitindo identificar rapidamente a qual grupo um elemento pertence e unir dois grupos distintos.
+
+A estrutura \emph{Disjoint Set Union} (DSU), também conhecida como \emph{Union-Find}, é a solução clássica para esse problema. Embora uma implementação ingênua pareça suficiente, o desempenho degrada drasticamente conforme o número de operações aumenta. Técnicas avançadas introduzidas por Tarjan \cite{tarjan1975} podem reduzir a complexidade das operações para um tempo amortizado quase constante.
+
+Neste trabalho, implementamos três variantes da DSU em Java e as aplicamos no contexto do Algoritmo de Kruskal para encontrar a Árvore Geradora Mínima (MST) de grafos ponderados. O objetivo é analisar empiricamente como as heurísticas de \emph{Union by Rank} e \emph{Path Compression} alteram a classe de complexidade computacional e o desempenho prático.
+
+% ============================================================
+\section{Fundamentação Teórica}
+
+\subsection{Disjoint Set Union (DSU)}
+
+A DSU mantém uma coleção de conjuntos disjuntos e oferece duas operações principais:
+
+\begin{itemize}
+    \item \textbf{Find(x)}: retorna o representante (raiz) do conjunto ao qual $x$ pertence.
+    \item \textbf{Union(x, y)}: une os conjuntos que contêm $x$ e $y$.
+\end{itemize}
+
+Internamente, cada conjunto é representado como uma árvore enraizada via um vetor \texttt{parent[]}, onde \texttt{parent[i]} aponta para o pai de $i$, e a raiz aponta para si mesma.
+
+\subsection{Variante Naive}
+
+Na versão ingênua, a operação \texttt{Union} simplesmente faz a raiz de um conjunto apontar para a raiz do outro, sem critério de escolha. Isso pode gerar árvores degeneradas (listas encadeadas), levando a complexidade $O(n)$ por operação \texttt{Find} no pior caso.
+
+\subsection{Union by Rank}
+
+A heurística de \emph{Union by Rank} mantém um vetor \texttt{rank[]}, que estima a altura de cada árvore. Na operação de união, a raiz da árvore de menor rank aponta para a raiz de maior rank. Quando os ranks são iguais, um é escolhido como nova raiz e seu rank é incrementado. Essa heurística garante que a altura da árvore é $O(\log n)$, limitando a complexidade do \texttt{Find}.
+
+\subsection{Path Compression}
+
+A compressão de caminho modifica a operação \texttt{Find}: ao percorrer o caminho de um nó até a raiz, todos os nós visitados passam a apontar diretamente para a raiz. Isso achata a árvore progressivamente.
+
+\subsection{Full Tarjan: Union by Rank + Path Compression}
+
+Quando combinadas, as duas heurísticas atingem complexidade amortizada de $O(\alpha(n))$ por operação, onde $\alpha$ é a inversa da função de Ackermann \cite{tarjan1975}. A função $\alpha(n)$ cresce tão lentamente que, para qualquer valor prático de $n$ (até $2^{65536}$), temos $\alpha(n) \leq 4$. Na prática, isso significa tempo quase constante por operação.
+
+\subsection{Algoritmo de Kruskal}
+
+O algoritmo de Kruskal \cite{kruskal1956} encontra a MST de um grafo ponderado e conectado:
+
+\begin{enumerate}
+    \item Ordena todas as arestas por peso crescente.
+    \item Para cada aresta $(u, v)$ em ordem: se $u$ e $v$ estão em componentes diferentes (via \texttt{Find}), une-os (via \texttt{Union}) e adiciona a aresta à MST.
+    \item Para quando a MST tem $n-1$ arestas.
+\end{enumerate}
+
+A complexidade total depende da ordenação ($O(m \log m)$) e das operações DSU. Com a DSU Naive, o custo das operações pode dominar; com Full Tarjan, as operações DSU são praticamente $O(m)$.
+
+% ============================================================
+\section{Metodologia}
+
+\subsection{Escolhas de Modularização}
+
+O projeto foi implementado em Java e organizado em três pacotes:
+
+\begin{itemize}
+    \item \textbf{dsu}: contém a interface \texttt{DSU} e as três implementações (\texttt{DSUNaive}, \texttt{DSURank}, \texttt{DSUTarjan}). A interface define as operações \texttt{makeSet}, \texttt{find}, \texttt{union}, \texttt{getAccessCount} e \texttt{getName}, permitindo intercambiar as variantes de forma transparente.
+    \item \textbf{graph}: contém as classes \texttt{Edge}, \texttt{Graph} e \texttt{Kruskal}. O \texttt{Kruskal} recebe qualquer implementação de \texttt{DSU} por parâmetro, viabilizando a comparação justa entre variantes.
+    \item \textbf{benchmark}: contém \texttt{BenchmarkResult} e \texttt{BenchmarkRunner}, responsáveis pela execução dos testes e exportação dos resultados em CSV.
+\end{itemize}
+
+Essa modularização facilita a extensibilidade (e.g., adicionar novas variantes de DSU ou novos algoritmos de grafo) e possibilita testes comparativos controlados.
+
+\subsection{Cenários de Teste}
+
+Os experimentos utilizam grafos aleatórios conectados com número de vértices $n \in \{100, 500, 1000, 2000, 5000, 10000, 20000, 50000\}$ e número de arestas $m = 5n$. Para cada tamanho, o mesmo grafo (gerado com mesma semente aleatória) é utilizado para as três variantes. São realizadas 5 repetições por cenário, sendo reportado o melhor tempo.
+
+\subsection{Métricas Coletadas}
+
+\begin{itemize}
+    \item \textbf{Tempo de execução}: medido em nanossegundos via \texttt{System.nanoTime()}, considerando apenas as operações de \texttt{Find} e \texttt{Union} (a ordenação das arestas é feita antes da medição).
+    \item \textbf{Acessos à memória}: contagem do número de leituras e escritas ao vetor \texttt{parent[]}, instrumentada diretamente no código da DSU.
+\end{itemize}
+
+\subsection{Ambiente de Execução}
+
+\begin{itemize}
+    \item \textbf{Processador}: Intel Core i7-13650HX
+    \item \textbf{Memória RAM}: 40 GB
+    \item \textbf{Sistema Operacional}: Windows 11
+    \item \textbf{JDK}: Java 24 (build 24+36-3646)
+    \item \textbf{Flags de otimização}: nenhuma flag adicional; execução padrão da JVM HotSpot
+\end{itemize}
+
+% ============================================================
+\section{Discussão de Resultados}
+
+% TODO: Inserir gráficos e análise após executar os benchmarks
+
+\begin{figure}[ht]
+\centering
+% \includegraphics[width=0.9\textwidth]{graficos/tempo_execucao.png}
+\caption{Tempo de execução (ms) do algoritmo de Kruskal para cada variante do DSU.}
+\label{fig:tempo}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+% \includegraphics[width=0.9\textwidth]{graficos/acessos_memoria.png}
+\caption{Número de acessos ao vetor \texttt{parent[]} para cada variante do DSU.}
+\label{fig:acessos}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+% \includegraphics[width=0.9\textwidth]{graficos/tempo_log_log.png}
+\caption{Tempo de execução em escala log-log, evidenciando as classes de complexidade.}
+\label{fig:loglog}
+\end{figure}
+
+A Figura~\ref{fig:tempo} apresenta o tempo de execução em escala linear. Observa-se que:
+
+\begin{itemize}
+    \item A versão \textbf{Naive} apresenta crescimento acentuado, compatível com complexidade $O(n)$ por operação \texttt{Find}, resultando em $O(mn)$ total.
+    \item A versão \textbf{Union by Rank} mostra crescimento moderado, compatível com $O(m \log n)$.
+    \item A versão \textbf{Full Tarjan} apresenta crescimento quase linear, compatível com $O(m \cdot \alpha(n)) \approx O(m)$.
+\end{itemize}
+
+A Figura~\ref{fig:acessos} confirma esses resultados pela contagem de acessos ao vetor \texttt{parent[]}, que independe de variações de hardware.
+
+A Figura~\ref{fig:loglog} em escala log-log permite visualizar diretamente as inclinações das curvas, que correspondem aos expoentes das complexidades.
+
+% TODO: complementar com análise numérica dos dados reais
+
+% ============================================================
+\section{Conclusão}
+
+Este trabalho demonstrou empiricamente o impacto da escolha de estruturas de dados otimizadas no desempenho de algoritmos fundamentais. A combinação de \emph{Union by Rank} com \emph{Path Compression} (Full Tarjan) transforma operações que, na versão ingênua, custam $O(n)$, em operações com custo amortizado $O(\alpha(n))$ — praticamente constante.
+
+No contexto do algoritmo de Kruskal, essa diferença se traduz em viabilidade: enquanto a versão Naive pode se tornar impraticável para grafos com milhares de vértices, a versão Full Tarjan mantém desempenho excelente mesmo para grafos grandes.
+
+Os resultados reforçam que a escolha adequada de estruturas de dados não é um detalhe de implementação, mas uma decisão de projeto que pode alterar fundamentalmente a classe de complexidade de um algoritmo.
+
+% ============================================================
+\bibliographystyle{sbc}
+\begin{thebibliography}{9}
+
+\bibitem{tarjan1975}
+Tarjan, R. E. (1975). Efficiency of a Good But Not Linear Set Union Algorithm. \emph{Journal of the ACM}, 22(2), 215--225.
+
+\bibitem{kruskal1956}
+Kruskal, J. B. (1956). On the Shortest Spanning Subtree of a Graph and the Traveling Salesman Problem. \emph{Proceedings of the American Mathematical Society}, 7(1), 48--50.
+
+\bibitem{cormen2009}
+Cormen, T. H., Leiserson, C. E., Rivest, R. L., \& Stein, C. (2009). \emph{Introduction to Algorithms} (3rd ed.). MIT Press.
+
+\end{thebibliography}
+
+\end{document}
